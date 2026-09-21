@@ -920,3 +920,131 @@
         width: 52px;
     }
 }
+
+/* ========== 新增：统一数据联动样式（仅追加，不改动原有布局） ========== */
+
+/* 网格视图：维度行上的断层数量徽标（数值来自 diagnosticModel） */
+.dimension-gap-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 10px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: var(--radius-full);
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    color: #fca5a5;
+    white-space: nowrap;
+}
+
+/* 工具标签 / 侧栏断层定位后的单元格高亮 */
+.matrix-table td.cell-focused {
+    outline: 2px solid var(--neon-cyan);
+    outline-offset: -2px;
+    animation: cellFocusPulse 1.3s ease-in-out 0s 2;
+    z-index: 5;
+}
+
+@keyframes cellFocusPulse {
+    0%, 100% {
+        box-shadow: inset 0 0 0 0 rgba(6, 182, 212, 0), 0 0 0 rgba(6, 182, 212, 0);
+    }
+    50% {
+        box-shadow: inset 0 0 30px rgba(6, 182, 212, 0.25), 0 0 28px rgba(6, 182, 212, 0.55);
+    }
+}
+
+/* 被定位命中的工具标签 */
+.tool-tag.is-active {
+    background: rgba(6, 182, 212, 0.45);
+    border-color: var(--neon-cyan);
+    color: #fff;
+    box-shadow: 0 0 16px rgba(6, 182, 212, 0.6);
+    transform: translateY(-2px) scale(1.05);
+}
+
+/* 侧栏：关键断层数量徽标（与概览区同源同值） */
+.sidebar-count-badge {
+    margin-left: 6px;
+    padding: 1px 9px;
+    font-size: 11px;
+    font-weight: 800;
+    border-radius: var(--radius-full);
+    background: linear-gradient(135deg, var(--error), #f97316);
+    color: #fff;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+}
+
+/* 侧栏：断层卡片上的所属维度标记 */
+.sidebar-gap-dim {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--neon-purple-light);
+    background: rgba(168, 85, 247, 0.12);
+    border: 1px solid rgba(168, 85, 247, 0.25);
+    border-radius: var(--radius-full);
+    padding: 2px 10px;
+    margin-bottom: 10px;
+}
+
+.sidebar-gap-dim-icon {
+    font-size: 12px;
+}
+
+/* 速赢清单：完成勾选按钮（不占额外行高，不改变列表宽度） */
+.quickwin-heading {
+    flex: 1;
+    min-width: 0;
+}
+
+.quickwin-check {
+    flex-shrink: 0;
+    align-self: flex-start;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid rgba(168, 85, 247, 0.45);
+    background: rgba(168, 85, 247, 0.08);
+    color: transparent;
+    font-size: 15px;
+    font-weight: 900;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast);
+    position: relative;
+    z-index: 2;
+}
+
+.quickwin-check:hover {
+    border-color: var(--neon-cyan);
+    box-shadow: 0 0 12px rgba(6, 182, 212, 0.4);
+    transform: scale(1.08);
+}
+
+.quickwin-check.is-done {
+    background: var(--gradient-cyan-green);
+    border-color: transparent;
+    color: #fff;
+    box-shadow: 0 0 14px rgba(16, 185, 129, 0.5);
+}
+
+/* 完成态卡片：仅做轻微视觉降亮，尺寸与间距保持不变 */
+.quickwin-card.is-completed {
+    border-color: rgba(16, 185, 129, 0.45);
+}
+
+.quickwin-card.is-completed .quickwin-title {
+    color: var(--neon-green-light);
+}
+
+.quickwin-card.is-completed .quickwin-desc {
+    opacity: 0.75;
+}

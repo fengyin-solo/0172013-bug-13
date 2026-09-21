@@ -49,14 +49,15 @@ class App {
     // 刷新数据
     refresh() {
         window.toast.info('刷新中', '正在重新加载数据...');
-        
+
         setTimeout(() => {
             window.componentRenderer.renderStats();
             window.componentRenderer.renderMatrix();
-            window.componentRenderer.renderQuickWins();
+            // 重新加载后勾选状态复位到与数据一致（全部未完成）
+            window.componentRenderer.resetQuickWins();
             window.chartManager.resize();
-            
-            window.toast.success('刷新完成', '数据已更新');
+
+            window.toast.success('刷新完成', '数据已更新，速赢清单已复位');
         }, 1000);
     }
 

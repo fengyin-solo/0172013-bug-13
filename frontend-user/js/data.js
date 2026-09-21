@@ -118,11 +118,14 @@ const matrixData = {
 };
 
 // 速赢行动清单
+// 注意：completed 是唯一的完成态数据来源，页面加载/刷新时 UI 一律以此为准（默认 false），
+// 勾选状态只保存在内存中，不写入 localStorage，重新加载后复位。
 const quickWins = [
     {
         icon: '🔗',
         title: '企微私域基建',
         timeline: '第1-4周',
+        completed: false,
         desc: '部署企业微信+SCRM系统，设计门店导购利益分成机制，解决渠道抵触问题。建立活码体系，实现渠道来源追踪。',
         kpis: [
             { value: '100%', label: '门店覆盖率' },
@@ -133,6 +136,7 @@ const quickWins = [
         icon: '📱',
         title: '小程序体验重构',
         timeline: '第3-8周',
+        completed: false,
         desc: '简化入会流程至3步以内，优化罐内码扫码体验，增加即时奖励机制。将小程序从"积分工具"升级为"潜客蓄水池"。',
         kpis: [
             { value: '↓60%', label: '入会流失率' },
@@ -143,6 +147,7 @@ const quickWins = [
         icon: '🎬',
         title: '内容能力建设',
         timeline: '第5-12周',
+        completed: false,
         desc: '组建内部短视频团队，建立内容素材库，设计种草内容矩阵。从"枯燥医务知识"转向"场景化育儿内容"，驱动新客转化。',
         kpis: [
             { value: '30+', label: '月产内容数' },
@@ -152,11 +157,13 @@ const quickWins = [
 ];
 
 // 统计卡片数据
+// 断层数量不在这里硬编码：valueKey: 'keyGapCount' 由下方 diagnosticModel 统一计算填充，
+// 概览区、网格视图、诊断摘要侧栏均取同一份计算结果。
 const statsData = [
     { icon: '🎯', value: '拉新', label: '2026 核心战略', trend: null },
     { icon: '⚠️', value: '阶段1', label: '当前成熟度定位', trend: null },
     { icon: '🚀', value: '阶段2-3', label: '目标成熟度', trend: '+2级' },
-    { icon: '🔥', value: '3个', label: '核心断层待解决', trend: null }
+    { icon: '🔥', value: null, valueKey: 'keyGapCount', label: '核心断层待解决', trend: null }
 ];
 
 // 漏斗图数据
@@ -186,6 +193,7 @@ const diagnosticSummary = {
     keyGaps: [
         {
             id: 1,
+            dimension: 'acquisition',
             icon: '🔻',
             title: '获客→入会断层',
             severity: 'critical',
@@ -195,6 +203,7 @@ const diagnosticSummary = {
         },
         {
             id: 2,
+            dimension: 'ma',
             icon: '🔄',
             title: '首购→复购断层',
             severity: 'critical',
@@ -204,6 +213,7 @@ const diagnosticSummary = {
         },
         {
             id: 3,
+            dimension: 'touchpoints',
             icon: '📡',
             title: '触达→自动化断层',
             severity: 'high',
@@ -239,3 +249,71 @@ const radarData = {
         }
     ]
 };
+
+/* ========================================
+   统一派生计算层（单一数据来源）
+   概览区统计卡片 / 网格视图 / 诊断摘要侧栏的断层数量，
+   以及工具标签到矩阵单元格的定位，全部来自这里的同一份计算结果，
+   任何展示层都不再自行硬编码或遍历计数。
+   ======================================== */
+const diagnosticModel = (() => {
+    // 维度 key -> 维度元信息，便于断层与网格行互相定位
+    const dimensionMap = {};
+    matrixData.dimensions.forEach(dim => { dimensionMap[dim.key] = dim; });
+
+    // 规范化关键断层：补齐所属维度信息
+    const keyGaps = diagnosticSummary.keyGaps.map(gap => ({
+        ...gap,
+        dimensionName: dimensionMap[gap.dimension] ? dimensionMap[gap.dimension].name : '',
+        dimensionIcon: dimensionMap[gap.dimension] ? dimensionMap[gap.dimension].icon : ''
+    }));
+
+    // 按维度统计断层数量（每个维度固定从同一数组归并，保证三处一致）
+    const gapCountByDimension = {};
+    matrixData.dimensions.forEach(dim => { gapCountByDimension[dim.key] = 0; });
+    keyGaps.forEach(gap => {
+        if (Object.prototype.hasOwnProperty.call(gapCountByDimension, gap.dimension)) {
+            gapCountByDimension[gap.dimension] += 1;
+        }
+    });
+
+    // 工具名 -> 单元格坐标列表（同一工具可能出现在多个格子中）
+    // 点击工具标签时据此定位 data-dim/data-phase 对应的单元格
+    const toolCellMap = {};
+    matrixData.dimensions.forEach(dim => {
+        matrixData.phases.forEach(phase => {
+            const cell = matrixData.cells[dim.key][phase.key];
+            if (!cell || !cell.tools) return;
+            ['international', 'domestic'].forEach(group => {
+                (cell.tools[group] || []).forEach(tool => {
+                    if (!toolCellMap[tool]) toolCellMap[tool] = [];
+                    toolCellMap[tool].push({
+                        dimension: dim.key,
+                        phase: phase.key,
+                        scope: group
+                    });
+                });
+            });
+        });
+    });
+
+    return {
+        keyGaps,
+        keyGapCount: keyGaps.length,
+        criticalGapCount: keyGaps.filter(g => g.severity === 'critical').length,
+        gapCountByDimension,
+        dimensionMap,
+        toolCellMap,
+
+        // 概览统计卡片：将 valueKey 解析为实际展示值
+        resolvedStats: statsData.map(stat => {
+            if (stat.valueKey === 'keyGapCount') {
+                return { ...stat, value: `${keyGaps.length}个` };
+            }
+            return { ...stat };
+        }),
+
+        // 速赢清单初始状态：完成态一律以数据字段为准（默认未完成）
+        initialQuickWins: () => quickWins.map(qw => ({ ...qw }))
+    };
+})();

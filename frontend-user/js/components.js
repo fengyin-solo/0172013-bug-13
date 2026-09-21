@@ -6,6 +6,8 @@ class ComponentRenderer {
     constructor() {
         this.typewriterText = '基于2026年"拉新"战略核心，诊断当前会员体系成熟度，识别关键断层，规划升级路径...';
         this.charIndex = 0;
+        // 速赢完成态的内存工作副本：从数据源头复位，不写入 localStorage
+        this.quickWinsState = diagnosticModel.initialQuickWins();
     }
 
     // 打字机效果
@@ -28,7 +30,9 @@ class ComponentRenderer {
         const container = document.getElementById('statsGrid');
         if (!container) return;
 
-        container.innerHTML = statsData.map((stat, index) => `
+        // 统一取 diagnosticModel.resolvedStats，断层数量不再硬编码
+        const stats = diagnosticModel.resolvedStats;
+        container.innerHTML = stats.map((stat, index) => `
             <div class="glass-card stat-card fade-in delay-${index + 1}" data-index="${index}">
                 <span class="stat-icon">${stat.icon}</span>
                 <div class="stat-value">${stat.value}</div>
@@ -41,7 +45,7 @@ class ComponentRenderer {
         container.querySelectorAll('.stat-card').forEach(card => {
             card.addEventListener('click', () => {
                 const index = card.dataset.index;
-                const stat = statsData[index];
+                const stat = stats[index];
                 window.toast.info(stat.label, `当前值: ${stat.value}`);
             });
         });
@@ -53,7 +57,7 @@ class ComponentRenderer {
         if (!table) return;
 
         let html = '<thead><tr><th>运营维度</th>';
-        
+
         matrixData.phases.forEach(p => {
             html += `
                 <th>
@@ -67,11 +71,18 @@ class ComponentRenderer {
         html += '</tr></thead><tbody>';
 
         matrixData.dimensions.forEach((dim, dimIndex) => {
-            html += `<tr class="fade-in delay-${Math.min(dimIndex + 1, 5)}">`;
+            html += `<tr class="fade-in delay-${Math.min(dimIndex + 1, 5)}" data-dim-row="${dim.key}">`;
+
+            // 维度单元格：断层数量来自 diagnosticModel.gapCountByDimension（与概览、侧栏同源）
+            const gapCount = diagnosticModel.gapCountByDimension[dim.key] || 0;
+            const gapBadge = gapCount > 0
+                ? `<span class="dimension-gap-badge" data-gap-dim="${dim.key}">🔥 ${gapCount} 个断层</span>`
+                : '';
             html += `
                 <td class="dimension-cell">
                     <span class="dimension-icon">${dim.icon}</span>
                     ${dim.name}
+                    ${gapBadge}
                 </td>
             `;
 
@@ -89,7 +100,8 @@ class ComponentRenderer {
                     tag = '<span class="status-tag tag-target">🎯 改进目标</span>';
                 }
 
-                html += `<td class="${cellClass}"><div class="cell-content">${tag}<div class="sop-list">`;
+                // 单元格坐标：工具标签/侧栏断层卡片据此精确定位
+                html += `<td class="${cellClass}" data-dim="${dim.key}" data-phase="${phase.key}"><div class="cell-content">${tag}<div class="sop-list">`;
                 cell.sop.forEach(s => {
                     html += `<div class="sop-item">${s}</div>`;
                 });
@@ -98,10 +110,10 @@ class ComponentRenderer {
                 if (cell.tools && (cell.tools.international.length || cell.tools.domestic.length)) {
                     html += '<div class="tools-section"><div class="tools-label">🔧 推荐工具</div>';
                     cell.tools.international.forEach(t => {
-                        html += `<span class="tool-tag international" data-tool="${t}">${t}</span>`;
+                        html += `<span class="tool-tag international" data-tool="${t}" data-dim="${dim.key}" data-phase="${phase.key}">${t}</span>`;
                     });
                     cell.tools.domestic.forEach(t => {
-                        html += `<span class="tool-tag domestic" data-tool="${t}">${t}</span>`;
+                        html += `<span class="tool-tag domestic" data-tool="${t}" data-dim="${dim.key}" data-phase="${phase.key}">${t}</span>`;
                     });
                     html += '</div>';
                 }
@@ -113,18 +125,55 @@ class ComponentRenderer {
         html += '</tbody>';
         table.innerHTML = html;
 
-        // 添加工具标签点击事件
-        table.querySelectorAll('.tool-tag').forEach(tag => {
-            tag.addEventListener('click', () => {
-                const toolName = tag.dataset.tool;
-                const isInternational = tag.classList.contains('international');
+        // 工具标签点击：跳进网格视图并高亮它所在的单元格
+        table.querySelectorAll('.tool-tag').forEach(tagEl => {
+            tagEl.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const { dim, phase, tool } = tagEl.dataset;
+                const isInternational = tagEl.classList.contains('international');
+                this.focusMatrixCell(dim, phase, { tool });
                 window.toast.info(
-                    '工具推荐',
-                    `${toolName} - ${isInternational ? '国际工具' : '国内工具'}`,
-                    3000
+                    '工具定位',
+                    `${tool} - ${isInternational ? '国际工具' : '国内工具'}，已在矩阵中高亮对应格子`,
+                    2500
                 );
             });
         });
+    }
+
+    // 定位并高亮矩阵单元格（工具标签 / 侧栏断层卡片共用）
+    focusMatrixCell(dimKey, phaseKey, options = {}) {
+        const table = document.getElementById('matrixTable');
+        if (!table) return;
+
+        // 优先按精确坐标查找；找不到时退化到该维度的"当前位置"格
+        let cell = table.querySelector(`td[data-dim="${dimKey}"][data-phase="${phaseKey}"]`);
+        if (!cell && dimKey) {
+            cell = table.querySelector(`td[data-dim="${dimKey}"].cell-current`)
+                || table.querySelector(`td[data-dim="${dimKey}"]`);
+        }
+        if (!cell) return;
+
+        // 清理上一次的高亮（工具标签与单元格）
+        table.querySelectorAll('.cell-focused').forEach(el => el.classList.remove('cell-focused'));
+        table.querySelectorAll('.tool-tag.is-active').forEach(el => el.classList.remove('is-active'));
+
+        cell.classList.add('cell-focused');
+        if (typeof cell.scrollIntoView === 'function') {
+            cell.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        }
+
+        if (options.tool) {
+            const sameTool = cell.querySelectorAll(`.tool-tag[data-tool="${CSS.escape(options.tool)}"]`);
+            sameTool.forEach(el => el.classList.add('is-active'));
+        }
+
+        // 高亮在动画结束后自动复位，保持状态与数据一致
+        clearTimeout(this._focusTimer);
+        this._focusTimer = setTimeout(() => {
+            cell.classList.remove('cell-focused');
+            cell.querySelectorAll('.tool-tag.is-active').forEach(el => el.classList.remove('is-active'));
+        }, 2600);
     }
 
     // 渲染速赢行动清单
@@ -132,15 +181,21 @@ class ComponentRenderer {
         const grid = document.getElementById('quickwinsGrid');
         if (!grid) return;
 
-        grid.innerHTML = quickWins.map((qw, i) => `
-            <div class="glass-card quickwin-card fade-in delay-${i + 1}" data-index="${i}">
+        grid.innerHTML = this.quickWinsState.map((qw, i) => `
+            <div class="glass-card quickwin-card fade-in delay-${i + 1}${qw.completed ? ' is-completed' : ''}" data-index="${i}">
                 <div class="quickwin-number">${i + 1}</div>
                 <div class="quickwin-header">
                     <div class="quickwin-icon">${qw.icon}</div>
-                    <div>
+                    <div class="quickwin-heading">
                         <div class="quickwin-title">${qw.title}</div>
                         <div class="quickwin-timeline">⏱️ ${qw.timeline}</div>
                     </div>
+                    <button class="quickwin-check ${qw.completed ? 'is-done' : ''}"
+                            data-index="${i}"
+                            role="checkbox"
+                            aria-checked="${qw.completed}"
+                            aria-label="标记「${qw.title}」为完成"
+                            title="${qw.completed ? '取消完成' : '标记完成'}">${qw.completed ? '✓' : ''}</button>
                 </div>
                 <div class="quickwin-desc">${qw.desc}</div>
                 <div class="quickwin-kpi">
@@ -154,18 +209,53 @@ class ComponentRenderer {
             </div>
         `).join('');
 
-        // 添加点击事件
+        // 勾选按钮：只更新内存状态，不做任何持久化
+        grid.querySelectorAll('.quickwin-check').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const i = Number(btn.dataset.index);
+                this.toggleQuickWin(i, btn);
+            });
+        });
+
+        // 卡片点击事件
         grid.querySelectorAll('.quickwin-card').forEach(card => {
             card.addEventListener('click', () => {
-                const index = card.dataset.index;
-                const qw = quickWins[index];
+                const index = Number(card.dataset.index);
+                const qw = this.quickWinsState[index];
                 window.toast.success(
                     qw.title,
-                    `执行周期: ${qw.timeline}`,
+                    `执行周期: ${qw.timeline}${qw.completed ? ' | ✅ 已完成' : ''}`,
                     4000
                 );
             });
         });
+    }
+
+    // 切换速赢完成态：状态更新后同步 DOM，保持界面与数据一致
+    toggleQuickWin(index, btn) {
+        const qw = this.quickWinsState[index];
+        if (!qw) return;
+
+        qw.completed = !qw.completed;
+        const card = btn.closest('.quickwin-card');
+        if (card) card.classList.toggle('is-completed', qw.completed);
+        btn.classList.toggle('is-done', qw.completed);
+        btn.setAttribute('aria-checked', String(qw.completed));
+        btn.textContent = qw.completed ? '✓' : '';
+        btn.title = qw.completed ? '取消完成' : '标记完成';
+
+        window.toast.info(
+            qw.completed ? '已标记完成' : '已取消完成',
+            qw.title,
+            2000
+        );
+    }
+
+    // 重新加载/刷新时调用：从数据源头复位所有勾选
+    resetQuickWins() {
+        this.quickWinsState = diagnosticModel.initialQuickWins();
+        this.renderQuickWins();
     }
 
     // 创建粒子效果
@@ -217,25 +307,23 @@ class ComponentRenderer {
 
         this.renderSidebarContent(body);
 
-        body.querySelectorAll('.sidebar-gap-card').forEach((card, i) => {
+        // 点击断层卡片：关闭侧栏并在矩阵中定位该断层所属维度的当前位置格
+        body.querySelectorAll('.sidebar-gap-card').forEach(card => {
             card.addEventListener('click', () => {
                 sidebar.classList.remove('open');
                 toggle.style.opacity = '1';
                 toggle.style.pointerEvents = 'auto';
-                const targets = ['.charts-section', '.matrix-section', '.quickwins-section'];
-                const target = document.querySelector(targets[i] || targets[0]);
-                if (target) {
-                    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    target.style.transition = 'box-shadow 0.5s ease';
-                    target.style.boxShadow = '0 0 40px rgba(168, 85, 247, 0.5)';
-                    setTimeout(() => { target.style.boxShadow = ''; }, 2000);
-                }
+
+                const dimKey = card.dataset.gapDim;
+                this.focusMatrixCell(dimKey, null);
             });
         });
     }
 
     renderSidebarContent(container) {
         const d = diagnosticSummary;
+        // 断层列表与计数统一来自 diagnosticModel（与概览卡片、网格视图同源）
+        const gaps = diagnosticModel.keyGaps;
         let html = '';
 
         html += '<div class="sidebar-section">';
@@ -271,15 +359,20 @@ class ComponentRenderer {
         html += '</div>';
 
         html += '<div class="sidebar-section">';
-        html += '<div class="sidebar-section-title">🔴 关键断层</div>';
-        d.keyGaps.forEach(gap => {
+        // 数量直接读取统一模型，与概览区 "核心断层待解决" 永远一致
+        html += `<div class="sidebar-section-title">🔴 关键断层 <span class="sidebar-count-badge">${gaps.length}</span></div>`;
+        gaps.forEach(gap => {
             const sevClass = gap.severity === 'critical' ? 'is-critical' : 'is-high';
             html += `
-                <div class="sidebar-gap-card ${sevClass}" data-gap-id="${gap.id}">
+                <div class="sidebar-gap-card ${sevClass}" data-gap-id="${gap.id}" data-gap-dim="${gap.dimension}">
                     <div class="sidebar-gap-header">
                         <span class="sidebar-gap-icon">${gap.icon}</span>
                         <span class="sidebar-gap-title">${gap.title}</span>
                         <span class="sidebar-gap-severity ${sevClass}">${gap.severity === 'critical' ? '严重' : '高'}</span>
+                    </div>
+                    <div class="sidebar-gap-dim">
+                        <span class="sidebar-gap-dim-icon">${gap.dimensionIcon}</span>
+                        ${gap.dimensionName}
                     </div>
                     <div class="sidebar-gap-metric">
                         <span class="sidebar-gap-metric-value">${gap.metric}</span>
