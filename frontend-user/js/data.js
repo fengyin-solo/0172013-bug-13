@@ -156,7 +156,7 @@ const statsData = [
     { icon: '🎯', value: '拉新', label: '2026 核心战略', trend: null },
     { icon: '⚠️', value: '阶段1', label: '当前成熟度定位', trend: null },
     { icon: '🚀', value: '阶段2-3', label: '目标成熟度', trend: '+2级' },
-    { icon: '🔥', value: '3个', label: '核心断层待解决', trend: null }
+    { icon: '🔥', metric: 'keyGapTotal', label: '核心断层待解决', trend: null }
 ];
 
 // 漏斗图数据
@@ -191,7 +191,8 @@ const diagnosticSummary = {
             severity: 'critical',
             metric: '100% → 20% → 8%',
             metricLabel: '曝光→入会→首购',
-            description: '入会转化极低，门店导购无利益驱动机制，扫码流程复杂体验差'
+            description: '入会转化极低，门店导购无利益驱动机制，扫码流程复杂体验差',
+            dimensionKeys: ['acquisition', 'martech']
         },
         {
             id: 2,
@@ -200,7 +201,8 @@ const diagnosticSummary = {
             severity: 'critical',
             metric: '8% → 3%',
             metricLabel: '首购→复购留存',
-            description: '无生命周期管理与MOT触达，无自动化培育旅程，流失无预警'
+            description: '无生命周期管理与MOT触达，无自动化培育旅程，流失无预警',
+            dimensionKeys: ['ma', 'rights']
         },
         {
             id: 3,
@@ -209,7 +211,8 @@ const diagnosticSummary = {
             severity: 'high',
             metric: '<1%',
             metricLabel: '短信打开率',
-            description: '私域触点几乎空白，全靠人工群发，零自动化营销能力'
+            description: '私域触点几乎空白，全靠人工群发，零自动化营销能力',
+            dimensionKeys: ['touchpoints', 'ma']
         }
     ]
 };
@@ -239,3 +242,32 @@ const radarData = {
         }
     ]
 };
+
+/* ========================================
+   统一派生数据 —— 概览卡 / 矩阵网格 / 诊断侧栏
+   所有“断层数量”必须来自同一份计算结果，禁止各处自行硬编码
+   ======================================== */
+const diagnosticMetrics = (() => {
+    // 1) 断层总数与按维度分布（唯一计算入口）
+    const gaps = diagnosticSummary.keyGaps;
+    const gapCountByDimension = {};
+    matrixData.dimensions.forEach(dim => {
+        gapCountByDimension[dim.key] = gaps.filter(
+            gap => Array.isArray(gap.dimensionKeys) && gap.dimensionKeys.includes(dim.key)
+        ).length;
+    });
+
+    // 2) 概览卡取值（含 metric 占位的卡片在此统一解析）
+    const resolveStatValue = (stat) => {
+        if (Object.prototype.hasOwnProperty.call(stat, 'value')) return stat.value;
+        if (stat.metric === 'keyGapTotal') return `${gaps.length}个`;
+        return '';
+    };
+
+    return {
+        keyGaps: gaps,
+        keyGapTotal: gaps.length,
+        gapCountByDimension,
+        resolveStatValue
+    };
+})();

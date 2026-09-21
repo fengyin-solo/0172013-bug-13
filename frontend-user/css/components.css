@@ -920,3 +920,118 @@
         width: 52px;
     }
 }
+
+/* ========== 维度断层计数（与概览/侧栏同源） ========== */
+.dimension-gap-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 12px;
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--text-muted);
+    background: rgba(148, 163, 184, 0.08);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    white-space: nowrap;
+}
+
+.dimension-gap-badge.has-gap {
+    color: #fca5a5;
+    background: rgba(239, 68, 68, 0.12);
+    border-color: rgba(239, 68, 68, 0.35);
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.15);
+}
+
+/* ========== 矩阵单元格定位高亮（工具标签/断层卡片） ========== */
+.matrix-cell-highlight {
+    outline: 2px solid var(--neon-cyan) !important;
+    outline-offset: 2px;
+    box-shadow:
+        0 0 0 4px rgba(6, 182, 212, 0.25),
+        0 0 28px rgba(6, 182, 212, 0.55) !important;
+    animation: matrixCellPulse 1s ease-in-out 3;
+    z-index: 2;
+}
+
+@keyframes matrixCellPulse {
+    0%, 100% {
+        box-shadow:
+            0 0 0 4px rgba(6, 182, 212, 0.25),
+            0 0 28px rgba(6, 182, 212, 0.55) !important;
+    }
+    50% {
+        box-shadow:
+            0 0 0 7px rgba(236, 72, 153, 0.3),
+            0 0 40px rgba(236, 72, 153, 0.65) !important;
+    }
+}
+
+/* ========== 速赢清单完成勾选 ========== */
+.quickwin-check {
+    margin-left: auto;
+    align-self: flex-start;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(168, 85, 247, 0.35);
+    background: rgba(168, 85, 247, 0.08);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    position: relative;
+    z-index: 2;
+}
+
+.quickwin-check:hover {
+    border-color: rgba(168, 85, 247, 0.6);
+    color: var(--text-primary);
+    background: rgba(168, 85, 247, 0.2);
+}
+
+.quickwin-check-box {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(168, 85, 247, 0.5);
+    font-size: 10px;
+    line-height: 1;
+    color: transparent;
+    transition: all var(--transition-fast);
+}
+
+.quickwin-check.is-checked {
+    border-color: rgba(16, 185, 129, 0.6);
+    background: rgba(16, 185, 129, 0.18);
+    color: var(--neon-green-light);
+}
+
+.quickwin-check.is-checked .quickwin-check-box {
+    border-color: var(--neon-green);
+    background: var(--neon-green);
+    color: #04130d;
+}
+
+.quickwin-card.is-completed {
+    border-color: rgba(16, 185, 129, 0.45);
+}
+
+.quickwin-card.is-completed .quickwin-title,
+.quickwin-card.is-completed .quickwin-desc {
+    opacity: 0.65;
+}
+
+.quickwin-card.is-completed .quickwin-title {
+    text-decoration: line-through;
+    text-decoration-color: rgba(16, 185, 129, 0.6);
+}
